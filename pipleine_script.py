@@ -5,6 +5,7 @@ import os
 import multiprocessing
 from Bio.PDB import MMCIFParser, PDBIO
 
+
 """
 usage: python pipeline_script.py [INPUT DIR] [OUTPUT DIR]
 approx 5seconds per analysis
@@ -46,35 +47,34 @@ def run_parser(input_file, output_dir):
 
 def run_merizo_search(input_file, id, output_dir):
     output_path = os.path.join(output_dir, id)
-    cmd = ['python3',
-           '/home/almalinux/EDA1/merizo_search/merizo_search/merizo.py',
-           'easy-search',
-           input_file,
-           '/home/almalinux/EDA1/cath-4.3-foldclassdb',
-           output_path,  # Specify output path here
-           'tmp',
-           '--iterate',
-           '--output_headers',
-           '-d',
-           'cpu',
-           '--threads',
-           '1'
-           ]
+    tmp_dir = "/mnt/minio/temp"  # Specify the writable temp directory
+
+    # Correctly create a mutable environment dictionary
+    env = dict(os.environ)
+    env['PWD'] = os.getcwd()
+
+    cmd = [
+        'python3',
+        '/mnt/minio/Merzio/merizo_search/merizo_search/merizo.py',
+        'easy-search',
+        input_file,
+        '/mnt/minio/Merzio/cath-4.3-foldclassdb',
+        output_path,
+        tmp_dir,  # Pass the writable temporary directory
+        '--iterate',
+        '--output_headers',
+        '-d',
+        'cpu',
+        '--threads',
+        '1'
+    ]
     print(f'STEP 1: RUNNING MERIZO: {" ".join(cmd)}')
-    p = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+    p = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
     out, err = p.communicate()
     print(out.decode("utf-8"))
     if err:
         print(f"Merizo Error: {err.decode('utf-8')}")
 
-    # List output directory contents for debugging
-    print(f"Contents of output directory {output_dir}:")
-    print(os.listdir(output_dir))
-
-    # Check if output file exists
-    expected_output = output_path + "_search.tsv"
-    if not os.path.exists(expected_output):
-        print(f"ERROR: Expected output file {expected_output} not created by merizo.")
 
 def read_dir(input_dir):
     """
@@ -103,5 +103,5 @@ def pipeline(filepath, id, outpath):
 
 if __name__ == "__main__":
     pdbfiles = read_dir(sys.argv[1])
-    p = multiprocessing.Pool(10)
+    p = multiprocessing.Pool(4)
     p.starmap(pipeline, pdbfiles)
