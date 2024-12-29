@@ -5,41 +5,40 @@ import json
 from collections import defaultdict
 import statistics
 
+# Input arguments
+output_dir = sys.argv[1]  # Output directory
+input_file = sys.argv[2]  # Full path to the .tsv file
+id = os.path.basename(input_file).rstrip("_search.tsv")
+parsed_file_path = os.path.join(output_dir, f"{id}.parsed")
+
+print(f"Processing file: {input_file}")
+
+if not os.path.exists(input_file):
+    print(f"ERROR: File {input_file} not found.")
+    sys.exit(1)
+
 cath_ids = defaultdict(int)
 plDDT_values = []
 
-id = sys.argv[2].rstrip("_search.tsv")
-
-# Use absolute path
-input_file = os.path.abspath(os.path.join(sys.argv[1], sys.argv[2]))
-
-# Debugging: Print the absolute path being opened
-print(f"ABS PATH: {input_file}")
-print(f"Trying to open: {input_file}")
-
-# Check if file exists
-if not os.path.exists(input_file):
-    print(f"ERROR: File '{input_file}' does not exist.")
+try:
+    with open(input_file, "r") as fhIn:
+        next(fhIn)
+        reader = csv.reader(fhIn, delimiter="\t")
+        for row in reader:
+            plDDT_values.append(float(row[3]))
+            meta = json.loads(row[15])
+            cath_ids[meta["cath"]] += 1
+except Exception as e:
+    print(f"Error reading or processing {input_file}: {e}")
     sys.exit(1)
 
-# File processing
-with open(input_file, "r") as fhIn:
-    next(fhIn)
-    msreader = csv.reader(fhIn, delimiter='\t')
-    tot_entries = 0
-    for i, row in enumerate(msreader):
-        tot_entries = i + 1
-        plDDT_values.append(float(row[3]))
-        meta = row[15]
-        data = json.loads(meta)
-        cath_ids[data["cath"]] += 1
-
-# Writing output
-with open(id + ".parsed", "w", encoding="utf-8") as fhOut:
-    if len(plDDT_values) > 0:
-        fhOut.write(f"#{sys.argv[2]} Results. mean plddt: {statistics.mean(plDDT_values)}\n")
-    else:
-        fhOut.write(f"#{sys.argv[2]} Results. mean plddt: 0\n")
-    fhOut.write("cath_id,count\n")
-    for cath, v in cath_ids.items():
-        fhOut.write(f"{cath},{v}\n")
+try:
+    with open(parsed_file_path, "w", encoding="utf-8") as fhOut:
+        mean_plDDT = statistics.mean(plDDT_values) if plDDT_values else 0
+        fhOut.write(f"#{id} Results. mean plddt: {mean_plDDT}\n")
+        fhOut.write("cath_id,count\n")
+        for cath_id, count in cath_ids.items():
+            fhOut.write(f"{cath_id},{count}\n")
+    print(f"Parsed output saved to: {parsed_file_path}")
+except Exception as e:
+    print(f"Error writing parsed file {parsed_file_path}: {e}")
