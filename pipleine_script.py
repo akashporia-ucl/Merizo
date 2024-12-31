@@ -16,6 +16,21 @@ def convert_cif_to_pdb(cif_file, pdb_file):
     except Exception as e:
         print(f"Error converting {cif_file} to {pdb_file}: {e}")
 
+def validate_search_file(file_id, output_dir):
+    search_file_path = os.path.join(output_dir, f"{file_id}_search.tsv")
+    
+    if not os.path.exists(search_file_path):
+        print(f"Error: Search file {search_file_path} was not created.")
+        return False
+
+    with open(search_file_path, "r") as fh:
+        lines = fh.readlines()
+        if len(lines) <= 1:  # Only header or completely empty
+            print(f"Skipping {file_id}: Search file {search_file_path} is empty or contains only a header.")
+            return False
+
+    return True
+
 def run_merizo_search(input_file, file_id, output_dir):
     try:
         output_path = os.path.join(output_dir, file_id)
@@ -80,7 +95,12 @@ def pipeline(file_data):
             filepath = pdb_file  # Update to the converted file
 
         run_merizo_search(filepath, file_id, output_dir)
-        run_parser(file_id, output_dir)
+
+        # Validate search file before running the parser
+        if validate_search_file(file_id, output_dir):
+            run_parser(file_id, output_dir)
+        else:
+            print(f"Skipping parser for {file_id} due to invalid search file.")
 
         print(f"Completed pipeline for {file_id}")
     except Exception as e:
@@ -91,7 +111,7 @@ def read_dir(input_dir, output_dir):
     return [(file, os.path.basename(file).split('.')[0], output_dir) for file in file_list]
 
 if __name__ == "__main__":
-    conf = SparkConf().setAppName("CIFtoPDBPipeline").setMaster("spark://10.134.12.221:7077")
+    conf = SparkConf().setAppName("CIFtoPDBPipeline").setMaster("spark://management:7077")
     sc = SparkContext(conf=conf)
 
     input_dir = sys.argv[1]
