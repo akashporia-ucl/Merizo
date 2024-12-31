@@ -41,10 +41,10 @@ def run_merizo_search(input_file, file_id, output_dir):
 
         cmd = [
             'python3',
-            '/mnt/minio/Merzio/merizo_search/merizo_search/merizo.py',
+            '/mnt/minio/Merizo/merizo_search/merizo_search/merizo.py',
             'easy-search',
             input_file,
-            '/mnt/minio/Merzio/cath-4.3-foldclassdb',
+            '/mnt/minio/Merizo/cath-4.3-foldclassdb',
             output_path,
             tmp_dir,
             '--iterate',
