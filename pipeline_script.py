@@ -1,9 +1,14 @@
+from datetime import datetime
 from pyspark import SparkContext, SparkConf
 import os
 from subprocess import Popen, PIPE
 from Bio.PDB import MMCIFParser, PDBIO
 import sys
 import glob
+
+def get_app_name():
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    return f"MerizoRun-{timestamp}"
 
 def convert_cif_to_pdb(cif_file, pdb_file):
     try:
@@ -52,7 +57,7 @@ def run_merizo_search(input_file, file_id, output_dir):
             '-d',
             'cpu',
             '--threads',
-            '1'
+            '2'
         ]
         print(f"Running Merizo: {' '.join(cmd)}")
         process = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
@@ -89,10 +94,11 @@ def pipeline(file_data):
         filepath, file_id, output_dir = file_data
         print(f"Starting pipeline for {file_id}")
 
-        if filepath.endswith(".cif"):
-            pdb_file = filepath.replace(".cif", ".pdb")
-            convert_cif_to_pdb(filepath, pdb_file)
-            filepath = pdb_file  # Update to the converted file
+        # Convert CIF to PDB
+        #if filepath.endswith(".cif"):
+        #    pdb_file = filepath.replace(".cif", ".pdb")
+        #    convert_cif_to_pdb(filepath, pdb_file)
+        #    filepath = pdb_file  # Update to the converted file
 
         run_merizo_search(filepath, file_id, output_dir)
 
@@ -107,17 +113,19 @@ def pipeline(file_data):
         print(f"Pipeline error for {file_data}: {e}")
 
 def read_dir(input_dir, output_dir):
-    file_list = glob.glob(os.path.join(input_dir, "*.pdb")) + glob.glob(os.path.join(input_dir, "*.cif"))
+    file_list = glob.glob(os.path.join(input_dir, "*.pdb")) #+ glob.glob(os.path.join(input_dir, "*.cif"))
     return [(file, os.path.basename(file).split('.')[0], output_dir) for file in file_list]
 
 if __name__ == "__main__":
-    conf = SparkConf().setAppName("CIFtoPDBPipeline").setMaster("spark://management:7077")
+    app_name = get_app_name()
+    conf = SparkConf().setAppName(app_name).setMaster("spark://management:7077")
     sc = SparkContext(conf=conf)
 
     input_dir = sys.argv[1]
     output_dir = sys.argv[2]
-
+    print(f"--------------Running Merio search pipeline for {input_dir}--------------")
     files = read_dir(input_dir, output_dir)
-    num_partitions = min(len(files), 10)
+    num_partitions = min(len(files), sc.defaultParallelism)
+    print(f"Number of files: {len(files)}, Number of partitions: {num_partitions}")
     files_rdd = sc.parallelize(files, numSlices=num_partitions)
     files_rdd.foreach(pipeline)
