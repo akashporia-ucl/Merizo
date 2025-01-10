@@ -123,9 +123,40 @@ if __name__ == "__main__":
 
     input_dir = sys.argv[1]
     output_dir = sys.argv[2]
-    print(f"--------------Running Merio search pipeline for {input_dir}--------------")
+    print(f"--------------Running Merizo search pipeline for {input_dir}--------------")
+
     files = read_dir(input_dir, output_dir)
-    num_partitions = min(len(files), sc.defaultParallelism)
-    print(f"Number of files: {len(files)}, Number of partitions: {num_partitions}")
+    total_files = len(files)
+    num_partitions = min(total_files, sc.defaultParallelism)
+
+    print(f"Number of files: {total_files}, Number of partitions: {num_partitions}")
+
+    # Define a shared accumulator for progress tracking
+    progress_acc = sc.accumulator(0)
+
+    def pipeline_with_progress(file_data):
+        global progress_acc
+        try:
+            filepath, file_id, output_dir = file_data
+            print(f"Starting pipeline for {file_id}")
+
+            # Run the pipeline steps
+            run_merizo_search(filepath, file_id, output_dir)
+
+            # Validate search file before running the parser
+            if validate_search_file(file_id, output_dir):
+                run_parser(file_id, output_dir)
+            else:
+                print(f"Skipping parser for {file_id} due to invalid search file.")
+
+            print(f"Completed pipeline for {file_id}")
+        except Exception as e:
+            print(f"Pipeline error for {file_data}: {e}")
+        finally:
+            # Update progress and print every 100 files
+            progress_acc.add(1)
+            if progress_acc.value % 100 == 0:
+                print(f"Processed {progress_acc.value} of {total_files}")
+
     files_rdd = sc.parallelize(files, numSlices=num_partitions)
-    files_rdd.foreach(pipeline)
+    files_rdd.foreach(pipeline_with_progress)
