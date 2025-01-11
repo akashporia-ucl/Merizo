@@ -127,7 +127,7 @@ if __name__ == "__main__":
 
     files = read_dir(input_dir, output_dir)
     total_files = len(files)
-    num_partitions = min(total_files, sc.defaultParallelism)
+    num_partitions = min(total_files, sc.defaultParallelism * 2)
 
     print(f"Number of files: {total_files}, Number of partitions: {num_partitions}")
 
